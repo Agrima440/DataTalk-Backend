@@ -26,16 +26,16 @@ const userSchema = mongoose.Schema({
       return !this.googleId;
     },
   },
-  passwordconfirm:{
-type:String,
-required:[true,"Please confirm your password"],
-validate:{
-  validator:function(el){
-    return el===this.password;
-  },
-  message:"Passwords are not same"
-}
-  },
+//   passwordconfirm:{
+// type:String,
+// required:[true,"Please confirm your password"],
+// validate:{
+//   validator:function(el){
+//     return el===this.password;
+//   },
+//   message:"Passwords are not same"
+// }
+//   },
   role: {
     type: String,
     enum: ["admin", "user", "guest"],

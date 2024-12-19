@@ -8,7 +8,7 @@ const generateOtp = require("../utils/generateOtp");
 const { STATUS_CODES } = require("http");
 const sendEmail = require("../utils/email");
 
-
+ 
 const signToken=(id)=>{
   return jwt.sign({id},process.env.JWT_SECRET,{
     expiresIn:process.env.JWT_EXPIRES_IN
@@ -40,10 +40,8 @@ data:{
 
 /////////// Sign Up //////////
 
-exports.signup = async (req, res) => {
-
-  
-    const {name, email, password,passwordconfirm} = req.body;
+exports.signup = async (req, res) => { 
+    const {name, email, password, passwordconfirm} = req.body;
     // validation
     if (!name) {
       return res.json({ error: "Name is Required" });
@@ -66,13 +64,16 @@ exports.signup = async (req, res) => {
         message: "Email Already Register, please login !",
       });
     }
-    const otp=generateOtp()
-    const otpExpires=Date.now()+24*60*60*100;
-    let newuser = await User.create({ name, email, password,passwordconfirm,otp,otpExpires });
-  try {
+    const otp = generateOtp();
+    const otpExpires = Date.now() + 24 * 60 * 60 * 100;
+    
+    // Create user without passwordconfirm
+    let newuser = await User.create({ name, email, password, otp, otpExpires });
+    
+    try {
 await sendEmail({
   email:newuser.email,
-  subject:"OTP for email Verification",
+  subject:"OTP for email Verification", 
   html:`<h1>Your OTP is : ${otp}</h1>`
 })
 createSendToken(newuser,res,"Registration Successful")
@@ -152,7 +153,7 @@ try{
 await sendEmail({
   email:user.email,
   subject:"Resend otp for Email Verification",
-  html:`<h1>A new otp has sent to your email</h1>`
+  html:`<h1>Your New Otp ${newOtp}</h1>`
 })
 res.status(200).json({
   success:true,
@@ -228,55 +229,55 @@ res.status(200).send({
 
 /////////////// Google Authentication /////////////
 
-exports.googleAuthController=async(req,res)=>{
-  try {
-      const { email, name, googleId } = req.body;
+// exports.googleAuthController=async(req,res)=>{
+//   try {
+//       const { email, name, googleId } = req.body;
 
-      let user = await User.findOne({ $or: [{ email }, { googleId }] });
+//       let user = await User.findOne({ $or: [{ email }, { googleId }] });
 
-      if (!user) {
-          user = new User({
-              name,
-              email,
-              googleId,
-              role: 'user'
-          });
-          await user.save();
-      } else {
-          user.googleId = googleId;
-          await user.save();
-      }
+//       if (!user) {
+//           user = new User({
+//               name,
+//               email,
+//               googleId,
+//               role: 'user'
+//           });
+//           await user.save();
+//       } else {
+//           user.googleId = googleId;
+//           await user.save();
+//       }
 
-      const token = jwt.sign({ _id: user._id }, process.env.JWT_KEY, {
-          expiresIn: '7d',
-      });
+//       const token = jwt.sign({ _id: user._id }, process.env.JWT_KEY, {
+//           expiresIn: '7d',
+//       });
 
-      res.status(200)
-          .cookie("token", token, {
-              expires: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-              secure: process.env.NODE_ENV === "development" ? true : false,
-              httpOnly: process.env.NODE_ENV === "development" ? true : false,
-              sameSite: process.env.NODE_ENV === "development" ? true : false,
-          })
-          .json({
-              success: true,
-              message: 'Google authentication successful',
-              user: {
-                  name: user.name,
-                  email: user.email,
+//       res.status(200)
+//           .cookie("token", token, {
+//               expires: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+//               secure: process.env.NODE_ENV === "development" ? true : false,
+//               httpOnly: process.env.NODE_ENV === "development" ? true : false,
+//               sameSite: process.env.NODE_ENV === "development" ? true : false,
+//           })
+//           .json({
+//               success: true,
+//               message: 'Google authentication successful',
+//               user: {
+//                   name: user.name,
+//                   email: user.email,
                  
-                  role: user.role
-              },
-              token
-          });
-  } catch (error) {
-      console.error('Google auth error:', error);
-      res.status(500).json({
-          success: false,
-          message: 'Authentication failed'
-      });
-  }
-}
+//                   role: user.role
+//               },
+//               token
+//           });
+//   } catch (error) {
+//       console.error('Google auth error:', error);
+//       res.status(500).json({
+//           success: false,
+//           message: 'Authentication failed'
+//       });
+//   }
+// }
 
  //////////////// Forget Password ////////////// 
 
