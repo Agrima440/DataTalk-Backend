@@ -13,6 +13,9 @@ router.post("/logout", logoutController);
 router.post("/forget-password",forgetPassword);
 router.post('/reset-password',resetPassword)
 
+// what the person do if the page reload on verify screen - user already exist
+// resend otp - with the decoded email only - not on send eny email and verify
+// 
 
 
 module.exports = router;

@@ -8,75 +8,75 @@ const generateOtp = require("../utils/generateOtp");
 const { STATUS_CODES } = require("http");
 const sendEmail = require("../utils/email");
 
- 
-const signToken=(id)=>{
-  return jwt.sign({id},process.env.JWT_SECRET,{
-    expiresIn:process.env.JWT_EXPIRES_IN
+
+const signToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN
   })
 }
-const createSendToken=(user,res,message)=>{
-  const token=signToken(user._id);
-  const cookieOptions={
-    expires:new Date(
-      Date.now()+process.env.JWT_COOKIE_EXPIRES_IN *24*60*60*1000
+const createSendToken = (user, res, message) => {
+  const token = signToken(user._id);
+  const cookieOptions = {
+    expires: new Date(
+      Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
     ),
-    httpOnly:true,
-    secure:process.env.NODE_ENV==="production",
-    sameSite:process.env.NODE_ENV==="production"?"none":"Lax",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "Lax",
 
   }
-  res.cookie("token",token,cookieOptions)
-  user.password=undefined;
-  user.Passwordconfirm=undefined;
+  res.cookie("token", token, cookieOptions)
+  user.password = undefined;
+  user.Passwordconfirm = undefined;
   res.status(200).json({
-success:true,
-message,
-token,
-data:{
-  user
-}
+    success: true,
+    message,
+    token,
+    data: {
+      user
+    }
   })
 }
 
 /////////// Sign Up //////////
 
-exports.signup = async (req, res) => { 
-    const {name, email, password, passwordconfirm} = req.body;
-    // validation
-    if (!name) {
-      return res.json({ error: "Name is Required" });
-    }
-    if (!email) {
-      return res
-        .status(404)
-        .json({ error: "Email is Required", success: false });
-    }
-    if (!password) {
-      return res.json({ error: "Password is Required" });
-    }
-    // check user
-    let existinguser = await User.findOne({ email });
+exports.signup = async (req, res) => {
+  const { name, email, password, passwordconfirm } = req.body;
+  // validation
+  if (!name) {
+    return res.json({ error: "Name is Required" });
+  }
+  if (!email) {
+    return res
+      .status(404)
+      .json({ error: "Email is Required", success: false });
+  }
+  if (!password) {
+    return res.json({ error: "Password is Required" });
+  }
+  // check user
+  let existinguser = await User.findOne({ email });
 
-    // existing user 
-    if (existinguser) {
-      return res.status(200).json({
-        success: false,
-        message: "Email Already Register, please login !",
-      });
-    }
-    const otp = generateOtp();
-    const otpExpires = Date.now() + 24 * 60 * 60 * 100;
-    
-    // Create user without passwordconfirm
-    let newuser = await User.create({ name, email, password, otp, otpExpires });
-    
-    try {
-await sendEmail({
-  email:newuser.email,
-  subject:"OTP for email Verification", 
-  html:`<h1>Your OTP is : ${otp}</h1>`
-})
-createSendToken(newuser,res,"Registration Successful")
+  // existing user 
+  if (existinguser) {
+    return res.status(200).json({
+      success: false,
+      message: "Email Already Register, please login !",
+    });
+  }
+  const otp = generateOtp();
+  const otpExpires = Date.now() + 24 * 60 * 60 * 100;
+
+  // Create user without passwordconfirm
+  let newuser = await User.create({ name, email, password, otp, otpExpires });
+
+  try {
+    await sendEmail({
+      email: newuser.email,
+      subject: "Email Verification OTP",
+      html: `<h1>Dear ${newuser.name},</h1><p>We are excited to have you on board! As a part of our verification process, <br> we have sent you a <br><b>One-Time Password (OTP)</b><br> to verify your email address. <br> <h1>Your OTP is: ${newuser.otp}.</h1> <div style="display:flex; gap:60px;"> This OTP is valid for <b>5 minutes</b></div> and is required to complete your registration process. Please enter this OTP on our website to verify your email address. If you have any issues or concerns, please feel free to reach out to us. We are always here to help. <br>  Thank you for choosing us and we look forward to serving you!</p><h4>Best Regards,</h4><h4>DataTalk.AI Team</h4>`
+    })
+    createSendToken(newuser, res, "Registration Successful")
 
   }
   catch (error) {
@@ -91,93 +91,95 @@ createSendToken(newuser,res,"Registration Successful")
 
 ////////////////// Verify Account By OTP /////////
 
-exports.verifyAccount=async(req,res)=>{
-  const {otp}=req.body;
-  if(!otp){
-    return res.status(400).json({success:false,
-      message:"Otp is missing"
+exports.verifyAccount = async (req, res) => {
+  const { otp } = req.body;
+  if (!otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Otp is missing"
     })
 
   }
-  const user=req.user;
-  if(user.otp!==otp){
-    return res.status(400).json({
-      success:false,
-      message:"Invalid OTP"
+  const user = req.user;
+  if (user.otp !== otp) {
+    return res.status(200).json({
+      success: false,
+      message: "Invalid OTP"
     })
   }
-  if(Date.now()>user.otpExpires){
+  if (Date.now() > user.otpExpires) {
     return res.status(400).json({
-      success:false,
-      message:"OTP has expired. Please request a new OTP"
+      success: false,
+      message: "OTP has expired. Please request a new OTP"
     })
-    }
-    user.isVerified=true,
-    user.otp=undefined,
-    user.otpExpires=undefined
-    await user.save({validateBeforeSave:false})
+  }
+  user.isVerified = true,
+    user.otp = undefined,
+    user.otpExpires = undefined
+  await user.save({ validateBeforeSave: false })
 
-    createSendToken(user,res,"Email has been verified")
- 
+  createSendToken(user, res, "Email has been verified")
+
 }
 
 ////////// Resend OTP /////////////
 
-exports.resendOTP=async(req,res)=>{
-  const { email } = req.body;
-  if(!email){
+exports.resendOTP = async (req, res) => {
+  const email = req.user.email;
+  if (!email) {
     return res.status(400).json({
-      success:false,
-      message:"Email is required to resend otp"
+      success: false,
+      message: "Email is required to resend otp"
     })
   }
-  const user=await User.findOne({email})
-  if(!user){
+  const user = await User.findOne({ email })
+  if (!user) {
     return res.status(400).json({
-      success:false,
-      message:"User Not Found"
+      success: false,
+      message: "User Not Found"
     })
   }
-  if(user.isVerified){
-    return res.status(400).json({
- success:false,
-      message:"User is already verified"
+  if (user.isVerified) {
+    return res.status(200).json({
+      success: false,
+      message: "User is already verified"
     })
   }
-  const newOtp=generateOtp();
-  user.otp=newOtp;
-  user.otpExpires=Date.now()+24*60*60*1000;
+  const newOtp = generateOtp();
+  user.otp = newOtp;
+  user.otpExpires = Date.now() + 24 * 60 * 60 * 1000;
 
-  await user.save({validateBeforeSave:false})
-try{
-await sendEmail({
-  email:user.email,
-  subject:"Resend otp for Email Verification",
-  html:`<h1>Your New Otp ${newOtp}</h1>`
-})
-res.status(200).json({
-  success:true,
-  message:"A new otp has sent to your email"
-})
-}
-catch(error){
-  user.otp=undefined;
-  user.otpExpires=undefined;
-  await user.save({validateBeforeSave:false})
-  console.log(error);
-  res.status(500).json({
-    success: false,
-    message: "Error in Resend OTP",
-    error,
-  });
-}
+  await user.save({ validateBeforeSave: false })
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: "Resend otp for Email Verification",
+      html: `<h1>Dear ${user.name},</h1><p>This email is for resend an email. <br> <h1>Your OTP is: ${user.otp}.</h1> <div style="display:flex; gap:60px;"> This OTP is valid for <b>5 minutes</b></div> and is required to complete your registration process. Please enter this OTP on our website to verify your email address. If you have any issues or concerns, please feel free to reach out to us. We are always here to help. <br>  Thank you for choosing us and we look forward to serving you!</p><h4>Best Regards,</h4><h4>DataTalk.AI Team</h4>`
+
+    })
+    res.status(200).json({
+      success: true,
+      message: "A new otp has sent to your email"
+    })
+  }
+  catch (error) {
+    user.otp = undefined;
+    user.otpExpires = undefined;
+    await user.save({ validateBeforeSave: false })
+    console.log(error);
+    res.status(500).json({
+      success: false,
+      message: "Error in Resend OTP",
+      error,
+    });
+  }
 
 }
 
 ///////////////////// Login ///////////////////..
 
 exports.loginController = async (req, res) => {
-  const { email, password} = req.body;
+  const { email, password } = req.body;
 
   try {
     // Validate required fields
@@ -187,11 +189,12 @@ exports.loginController = async (req, res) => {
         message: "Please Provide Email and password",
       });
     }
-   
+
     let user = await User.findOne({ email }).select("+password");
 
-    if (!user || !(await user.correctPassword(password,user.password))) return res.json({ message: "User not found", success: false });
-   createSendToken(user,res,"Login Successful")
+    if (!user) return res.json({ message: "You are not registered...!", success: false });
+    if (!(await user.correctPassword(password, user.password))) return res.json({ message: "Wrong Password", success: false });
+    createSendToken(user, res, "Login Successful")
   } catch (error) {
     console.log(error);
     res.status(500).json({
@@ -201,22 +204,22 @@ exports.loginController = async (req, res) => {
     });
   }
 };
-  
+
 /////////////////// Logout /////////////////
 
-exports.logoutController=async(req,res)=>{
-  try{
-res.cookie("token","loggedout",{
-  expires:new Date(Date.now()+10*1000),
-  httpOnly:true,
-  secure:process.env.NODE_ENV==="production"
-})
-res.status(200).send({
-  success:true,
-  message:"Logged Out Successfully",
-})
+exports.logoutController = async (req, res) => {
+  try {
+    res.cookie("token", "loggedout", {
+      expires: new Date(Date.now() + 10 * 1000),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production"
+    })
+    res.status(200).send({
+      success: true,
+      message: "Logged Out Successfully",
+    })
   }
-  catch(error){
+  catch (error) {
     await User.findByIdAndDelete(newuser.id)
     console.log(error);
     res.status(500).send({
@@ -265,7 +268,7 @@ res.status(200).send({
 //               user: {
 //                   name: user.name,
 //                   email: user.email,
-                 
+
 //                   role: user.role
 //               },
 //               token
@@ -279,43 +282,43 @@ res.status(200).send({
 //   }
 // }
 
- //////////////// Forget Password ////////////// 
+//////////////// Forget Password ////////////// 
 
-exports.forgetPassword=async(req,res)=>{
-  const {email}=req.body;
-  const user=await User.findOne({email});
-  if(!user){
+exports.forgetPassword = async (req, res) => {
+  const { email } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) {
     return res.status(400).json({
-      success:false,
-      message:"No user found"
+      success: false,
+      message: "No user found"
     })
   }
-  const otp=generateOtp();
-  user.resetPasswordOTP=otp;
-  user.resetPasswordOTPExpires=Date.now() + 300000;
+  const otp = generateOtp();
+  user.resetPasswordOTP = otp;
+  user.resetPasswordOTPExpires = Date.now() + 300000;
 
-  await user.save({validateBeforeSave:false});
-  try{
+  await user.save({ validateBeforeSave: false });
+  try {
     await sendEmail({
-      email:user.email,
-      subject:"Your password reset otp {valid for 5 min} ",
-      html:`<h1>Your password reset Otp ${otp}</h1>`
+      email: user.email,
+      subject: "Your password reset otp {valid for 5 min} ",
+      html: `<h1>Your password reset Otp ${otp}</h1>`
     })
     res.status(200).json({
-      success:true,
-      message:"Password Reset Otp is send to your email"
+      success: true,
+      message: "Password Reset Otp is send to your email"
     })
   }
-  catch(error){
-    user.resetPasswordOTP=undefined;
-    user.resetPasswordOTPExpires=undefined;
+  catch (error) {
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordOTPExpires = undefined;
     await user.save({
-      validateBeforeSave:false
+      validateBeforeSave: false
     })
     console.error('Error Reset Password:', error);
     res.status(500).json({
-        success: false,
-        message: 'Error Reset Password'
+      success: false,
+      message: 'Error Reset Password'
     });
 
   }
@@ -323,25 +326,25 @@ exports.forgetPassword=async(req,res)=>{
 
 ////////////////// Reset Password /////////////////
 
-exports.resetPassword=async(req,res)=>{
-  const {email,otp,password,passwordconfirm}=req.body;
-  const user=await User.findOne({
+exports.resetPassword = async (req, res) => {
+  const { email, otp, password, passwordconfirm } = req.body;
+  const user = await User.findOne({
     email,
-    resetPasswordOTP:otp,
-resetPasswordOTPExpires:{$gt:Date.now()},
+    resetPasswordOTP: otp,
+    resetPasswordOTPExpires: { $gt: Date.now() },
   })
 
-  if(!user) return res.status(400).json({
-    success:false,
-    message:"No user found"
+  if (!user) return res.status(400).json({
+    success: false,
+    message: "No user found"
   })
-  user.password=password;
-  user.passwordconfirm=passwordconfirm;
-  user.resetPasswordOTP=undefined;
-  user.resetPasswordOTPExpires=undefined
+  user.password = password;
+  user.passwordconfirm = passwordconfirm;
+  user.resetPasswordOTP = undefined;
+  user.resetPasswordOTPExpires = undefined
 
   await user.save();
 
-  createSendToken(user,res,"Password reset successfully")
+  createSendToken(user, res, "Password reset successfully")
 }
 
